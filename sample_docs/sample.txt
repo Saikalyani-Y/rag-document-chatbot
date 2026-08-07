@@ -1,0 +1,14 @@
+Sample Document: Introduction to Retrieval-Augmented Generation
+
+Retrieval-Augmented Generation, or RAG, is a technique that combines information retrieval with text generation. Instead of relying solely on knowledge stored in a language model's parameters, a RAG system retrieves relevant pieces of text from an external knowledge source and provides them to the model as additional context before generating a response.
+
+Why RAG matters:
+Large language models are trained on a fixed dataset up to a certain point in time. This means they may not know about recent events, private company documents, or highly specific information that was never part of their training data. RAG solves this problem by letting a model reference up-to-date or domain-specific documents at the time a question is asked, rather than requiring the model to be retrained.
+
+How it works:
+A RAG pipeline typically has three stages: indexing, retrieval, and generation. During indexing, documents are split into smaller chunks and converted into numerical vector representations called embeddings. These embeddings are stored in a vector database. During retrieval, a user's question is also converted into an embedding, and the system searches the vector database for the most similar chunks. During generation, the retrieved chunks are passed to the language model along with the original question, allowing the model to produce an answer grounded in the retrieved material.
+
+Benefits of RAG:
+RAG reduces hallucination because the model has real source material to reference. It also allows organizations to build chatbots over their own private documents without fine-tuning a model from scratch. Because the knowledge source can be updated independently of the model, RAG systems can stay current simply by updating the underlying documents.
+
+This sample document is provided so you can test the chatbot without needing to upload your own file. Try asking questions such as "What is RAG?" or "Why does RAG reduce hallucination?" to see how the chatbot retrieves relevant context from this text before answering.
