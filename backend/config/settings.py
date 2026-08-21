@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 150
     top_k: int = 5
-    similarity_threshold: float = 0.4
+    similarity_threshold: float = 0.5
     history_turns: int = 6
 
     max_file_size_mb: int = 20

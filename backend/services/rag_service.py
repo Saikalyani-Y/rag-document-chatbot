@@ -56,9 +56,7 @@ def answer_question(conversation_id: str, question: str) -> dict:
     history = _build_history(conversation_id)
     answer = llm_service.generate_answer(context, history, question)
 
-    # The model itself may decide the retrieved chunks don't actually answer the
-    # question (e.g. a weak-but-above-threshold match) — don't show sources it didn't use.
-    if answer.strip() == NOT_FOUND_MESSAGE:
-        sources = []
-
+    # These chunks cleared the relevance threshold, so they're worth showing regardless
+    # of how the model phrased its answer — small local models don't reliably echo the
+    # exact refusal string, so string-matching the answer to decide this isn't reliable.
     return {"answer": answer, "sources": sources}
