@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Check, Copy, User, Sparkles } from 'lucide-react'
+import { Check, Copy, Globe, User, Sparkles } from 'lucide-react'
 import type { ChatMessage } from '../../types'
 import { SourceCitation } from '../SourceCitation/SourceCitation'
 import { LoadingIndicator } from '../LoadingIndicator/LoadingIndicator'
@@ -48,6 +48,13 @@ export function Message({ message }: { message: ChatMessage }) {
             </div>
           )}
         </div>
+
+        {!isUser && !message.pending && message.grounded === false && (
+          <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 text-xs text-amber-700 dark:text-amber-300">
+            <Globe size={12} />
+            Not from your documents
+          </div>
+        )}
 
         {!isUser && !message.pending && message.sources && <SourceCitation sources={message.sources} />}
 

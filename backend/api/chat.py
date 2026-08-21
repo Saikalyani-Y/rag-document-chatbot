@@ -41,6 +41,7 @@ def list_messages(conversation_id: str) -> list[MessageOut]:
             role=row["role"],
             content=row["content"],
             sources=json.loads(row["sources"]) if row["sources"] else None,
+            grounded=bool(row["grounded"]),
             created_at=row["created_at"],
         )
         for row in rows
@@ -56,13 +57,19 @@ def send_message(conversation_id: str, body: SendMessageRequest) -> SendMessageR
     if not question:
         raise DocumentProcessingError("Message cannot be empty.")
 
+    # Build history from prior turns before this question is persisted, so it isn't
+    # duplicated (once via history, once as the explicit current turn) in the LLM prompt.
+    result = rag_service.answer_question(conversation_id, question, allow_general=body.allow_general_knowledge)
+
     db.insert_message(str(uuid.uuid4()), conversation_id, "user", question)
     db.maybe_set_conversation_title(conversation_id, question)
 
-    result = rag_service.answer_question(conversation_id, question)
-
     message_id = str(uuid.uuid4())
-    db.insert_message(message_id, conversation_id, "assistant", result["answer"], result["sources"])
+    db.insert_message(
+        message_id, conversation_id, "assistant", result["answer"], result["sources"], result["grounded"]
+    )
     db.touch_conversation(conversation_id)
 
-    return SendMessageResponse(message_id=message_id, answer=result["answer"], sources=result["sources"])
+    return SendMessageResponse(
+        message_id=message_id, answer=result["answer"], sources=result["sources"], grounded=result["grounded"]
+    )

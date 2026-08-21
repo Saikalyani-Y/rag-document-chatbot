@@ -26,14 +26,15 @@ SYSTEM_PROMPT = (
 )
 
 
-def generate_answer(context: str, history: list[dict], question: str) -> str:
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "system", "content": f"Context:\n{context}"},
-    ]
-    messages.extend(history)
-    messages.append({"role": "user", "content": question})
+GENERAL_SYSTEM_PROMPT = (
+    "You are a helpful general-purpose assistant. The user's uploaded documents did not "
+    "contain relevant information for this question, so answer from your own general "
+    "knowledge instead. Be direct and helpful, and if you're not confident about a fact, "
+    "say so rather than guessing with false confidence."
+)
 
+
+def _chat(messages: list[dict]) -> str:
     try:
         response = _client.chat(model=settings.chat_model, messages=messages)
     except Exception as exc:
@@ -45,6 +46,25 @@ def generate_answer(context: str, history: list[dict], question: str) -> str:
         ) from exc
 
     return response["message"]["content"]
+
+
+def generate_answer(context: str, history: list[dict], question: str) -> str:
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": f"Context:\n{context}"},
+        *history,
+        {"role": "user", "content": question},
+    ]
+    return _chat(messages)
+
+
+def generate_general_answer(history: list[dict], question: str) -> str:
+    messages = [
+        {"role": "system", "content": GENERAL_SYSTEM_PROMPT},
+        *history,
+        {"role": "user", "content": question},
+    ]
+    return _chat(messages)
 
 
 def check_ollama_ready() -> tuple[bool, str]:

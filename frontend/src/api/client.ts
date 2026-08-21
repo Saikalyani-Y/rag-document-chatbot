@@ -67,13 +67,13 @@ export function listMessages(conversationId: string) {
   return request<ChatMessage[]>(`/conversations/${conversationId}/messages`)
 }
 
-export function sendMessage(conversationId: string, content: string) {
-  return request<{ message_id: string; answer: string; sources: Source[] }>(
+export function sendMessage(conversationId: string, content: string, allowGeneralKnowledge: boolean) {
+  return request<{ message_id: string; answer: string; sources: Source[]; grounded: boolean }>(
     `/conversations/${conversationId}/messages`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, allow_general_knowledge: allowGeneralKnowledge }),
     },
   )
 }

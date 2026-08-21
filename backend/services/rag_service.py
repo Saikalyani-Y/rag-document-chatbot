@@ -16,16 +16,26 @@ def _build_history(conversation_id: str) -> list[dict]:
     return [{"role": m["role"], "content": m["content"]} for m in recent]
 
 
-def answer_question(conversation_id: str, question: str) -> dict:
-    if db.count_all_chunks() == 0:
-        return {"answer": NOT_FOUND_MESSAGE, "sources": []}
+def answer_question(conversation_id: str, question: str, allow_general: bool = False) -> dict:
+    history = _build_history(conversation_id)
+
+    total_chunks = db.count_all_chunks()
+    if total_chunks == 0:
+        return _fallback(history, question, allow_general)
 
     query_vector = embedding_service.embed_query(question)
     hits = vector_store.search(query_vector, settings.top_k)
-    hits = [(chunk_id, score) for chunk_id, score in hits if score >= settings.similarity_threshold]
+
+    # Cosine similarity scores from a small local embedding model aren't well-calibrated
+    # for tiny document sets — an off-topic query can score higher than the one genuinely
+    # relevant chunk in a 3-chunk document. Filtering by an absolute threshold there does
+    # more harm (false negatives) than good, so below a small-corpus size, skip the filter
+    # and let the LLM's own judgment (see the grounded system prompt) decide relevance.
+    if total_chunks > settings.small_corpus_chunk_limit:
+        hits = [(chunk_id, score) for chunk_id, score in hits if score >= settings.similarity_threshold]
 
     if not hits:
-        return {"answer": NOT_FOUND_MESSAGE, "sources": []}
+        return _fallback(history, question, allow_general)
 
     chunk_rows = db.get_chunks_by_ids([chunk_id for chunk_id, _ in hits])
 
@@ -53,10 +63,19 @@ def answer_question(conversation_id: str, question: str) -> dict:
             )
 
     context = "\n\n".join(context_parts)
-    history = _build_history(conversation_id)
     answer = llm_service.generate_answer(context, history, question)
 
     # These chunks cleared the relevance threshold, so they're worth showing regardless
     # of how the model phrased its answer — small local models don't reliably echo the
     # exact refusal string, so string-matching the answer to decide this isn't reliable.
-    return {"answer": answer, "sources": sources}
+    return {"answer": answer, "sources": sources, "grounded": True}
+
+
+def _fallback(history: list[dict], question: str, allow_general: bool) -> dict:
+    """No document context cleared the relevance bar. Either refuse, or answer from the
+    model's general knowledge if the caller opted into that — clearly marked as ungrounded."""
+    if not allow_general:
+        return {"answer": NOT_FOUND_MESSAGE, "sources": [], "grounded": False}
+
+    answer = llm_service.generate_general_answer(history, question)
+    return {"answer": answer, "sources": [], "grounded": False}

@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS messages (
     role TEXT NOT NULL,
     content TEXT NOT NULL,
     sources TEXT,
+    grounded INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
@@ -52,6 +53,13 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Lightweight additive migrations for existing local databases."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(messages)")}
+    if "grounded" not in columns:
+        conn.execute("ALTER TABLE messages ADD COLUMN grounded INTEGER NOT NULL DEFAULT 1")
 
 
 @contextmanager
@@ -72,6 +80,7 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 def init_db() -> None:
     with get_connection() as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
 
 
 # --- documents -------------------------------------------------------------
@@ -203,11 +212,27 @@ def maybe_set_conversation_title(conversation_id: str, title: str) -> None:
 
 # --- messages -------------------------------------------------------------
 
-def insert_message(message_id: str, conversation_id: str, role: str, content: str, sources: Optional[list] = None) -> str:
+def insert_message(
+    message_id: str,
+    conversation_id: str,
+    role: str,
+    content: str,
+    sources: Optional[list] = None,
+    grounded: bool = True,
+) -> str:
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO messages (id, conversation_id, role, content, sources, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (message_id, conversation_id, role, content, json.dumps(sources) if sources is not None else None, now_iso()),
+            """INSERT INTO messages (id, conversation_id, role, content, sources, grounded, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                message_id,
+                conversation_id,
+                role,
+                content,
+                json.dumps(sources) if sources is not None else None,
+                1 if grounded else 0,
+                now_iso(),
+            ),
         )
         return message_id
 

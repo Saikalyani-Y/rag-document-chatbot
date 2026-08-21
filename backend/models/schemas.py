@@ -33,17 +33,20 @@ class MessageOut(BaseModel):
     role: str
     content: str
     sources: Optional[list[SourceOut]] = None
+    grounded: bool = True
     created_at: str
 
 
 class SendMessageRequest(BaseModel):
     content: str
+    allow_general_knowledge: bool = False
 
 
 class SendMessageResponse(BaseModel):
     message_id: str
     answer: str
     sources: list[SourceOut]
+    grounded: bool
 
 
 class HealthOut(BaseModel):

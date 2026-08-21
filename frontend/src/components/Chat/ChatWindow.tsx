@@ -1,11 +1,11 @@
-import { AlertCircle, X } from 'lucide-react'
+import { AlertCircle, Globe, X } from 'lucide-react'
 import { useChat } from '../../context/ChatContext'
 import { ChatInput } from '../ChatInput/ChatInput'
 import { MessageList } from './MessageList'
 import { WelcomeScreen } from './WelcomeScreen'
 
 export function ChatWindow() {
-  const { messages, sending, ask, error, dismissError } = useChat()
+  const { messages, sending, ask, error, dismissError, allowGeneralKnowledge, setAllowGeneralKnowledge } = useChat()
 
   return (
     <div className="flex h-full flex-col">
@@ -25,9 +25,27 @@ export function ChatWindow() {
             </button>
           </div>
         )}
+
+        <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 select-none text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="relative inline-flex h-4 w-7 items-center">
+            <input
+              type="checkbox"
+              checked={allowGeneralKnowledge}
+              onChange={(e) => setAllowGeneralKnowledge(e.target.checked)}
+              className="peer sr-only"
+            />
+            <span className="absolute inset-0 rounded-full bg-neutral-300 transition-colors peer-checked:bg-blue-600 dark:bg-neutral-700" />
+            <span className="absolute left-0.5 h-3 w-3 rounded-full bg-white transition-transform peer-checked:translate-x-3" />
+          </span>
+          <Globe size={12} />
+          Also use general knowledge when documents don't have the answer
+        </label>
+
         <ChatInput onSend={ask} disabled={sending} />
         <p className="mt-2 text-center text-xs text-neutral-400 dark:text-neutral-600">
-          Answers are grounded in your uploaded documents and may be incomplete.
+          {allowGeneralKnowledge
+            ? 'Answers use your documents first, falling back to general knowledge — check the badge on each answer.'
+            : 'Answers are grounded in your uploaded documents and may be incomplete.'}
         </p>
       </div>
     </div>

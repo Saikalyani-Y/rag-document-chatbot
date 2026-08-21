@@ -32,6 +32,7 @@ export interface ChatMessage {
   role: MessageRole
   content: string
   sources?: Source[] | null
+  grounded?: boolean
   created_at: string
   pending?: boolean
 }

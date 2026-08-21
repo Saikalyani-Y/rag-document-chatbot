@@ -15,6 +15,8 @@ interface ChatContextValue {
   messages: ChatMessage[]
   sending: boolean
   error: string | null
+  allowGeneralKnowledge: boolean
+  setAllowGeneralKnowledge: (value: boolean) => void
   selectConversation: (id: string) => Promise<void>
   newChat: () => void
   removeConversation: (id: string) => Promise<void>
@@ -30,6 +32,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [allowGeneralKnowledge, setAllowGeneralKnowledge] = useState(false)
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -107,7 +110,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setSending(true)
 
       try {
-        const result = await sendMessage(conversationId, content)
+        const result = await sendMessage(conversationId, content, allowGeneralKnowledge)
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== 'pending'),
           {
@@ -115,6 +118,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             role: 'assistant',
             content: result.answer,
             sources: result.sources,
+            grounded: result.grounded,
             created_at: new Date().toISOString(),
           },
         ])
@@ -126,7 +130,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setSending(false)
       }
     },
-    [activeId, refreshConversations],
+    [activeId, allowGeneralKnowledge, refreshConversations],
   )
 
   const dismissError = useCallback(() => setError(null), [])
@@ -139,6 +143,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         messages,
         sending,
         error,
+        allowGeneralKnowledge,
+        setAllowGeneralKnowledge,
         selectConversation,
         newChat,
         removeConversation,
