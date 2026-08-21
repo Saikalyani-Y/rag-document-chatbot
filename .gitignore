@@ -1,0 +1,26 @@
+# Environment / secrets
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Backend runtime data (uploads, sqlite db, faiss index)
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+backend/storage/*.db
+backend/storage/*.faiss
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# OS
+.DS_Store
