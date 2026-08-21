@@ -17,12 +17,16 @@ export interface Conversation {
   updated_at: string
 }
 
+export type SourceKind = 'document' | 'web'
+
 export interface Source {
-  document_id: string
+  kind: SourceKind
+  document_id: string | null
   filename: string
   label: string
   chunk_id: number
   score: number
+  url: string | null
 }
 
 export type MessageRole = 'user' | 'assistant'

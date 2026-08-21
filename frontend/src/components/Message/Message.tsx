@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Check, Copy, Globe, User, Sparkles } from 'lucide-react'
+import { Brain, Check, Copy, Globe, User, Sparkles } from 'lucide-react'
 import type { ChatMessage } from '../../types'
 import { SourceCitation } from '../SourceCitation/SourceCitation'
 import { LoadingIndicator } from '../LoadingIndicator/LoadingIndicator'
@@ -50,9 +50,22 @@ export function Message({ message }: { message: ChatMessage }) {
         </div>
 
         {!isUser && !message.pending && message.grounded === false && (
-          <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 text-xs text-amber-700 dark:text-amber-300">
-            <Globe size={12} />
-            Not from your documents
+          <div
+            className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+              message.sources && message.sources.length > 0
+                ? 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+            }`}
+          >
+            {message.sources && message.sources.length > 0 ? (
+              <>
+                <Globe size={12} /> Answered from web search, not your documents
+              </>
+            ) : (
+              <>
+                <Brain size={12} /> General knowledge (unverified, not from your documents)
+              </>
+            )}
           </div>
         )}
 

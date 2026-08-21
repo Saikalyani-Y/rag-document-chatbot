@@ -21,11 +21,13 @@ class ConversationOut(BaseModel):
 
 
 class SourceOut(BaseModel):
-    document_id: str
+    kind: str = "document"  # "document" | "web"
+    document_id: Optional[str] = None
     filename: str
     label: str
     chunk_id: int
     score: float
+    url: Optional[str] = None
 
 
 class MessageOut(BaseModel):

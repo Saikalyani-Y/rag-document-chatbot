@@ -9,8 +9,9 @@ A Retrieval-Augmented Generation (RAG) chatbot that answers questions about your
 - Chunking with page (PDF) / section (TXT, DOCX) tracking for accurate citations
 - Local embeddings (`nomic-embed-text`) + local chat generation (`llama3.2:3b`) via Ollama
 - Cosine-similarity retrieval over a persisted FAISS index, with a relevance threshold so the model isn't fed irrelevant context
-- Grounded answers only: if the documents don't contain the answer, the assistant says so explicitly instead of guessing
-- Source citations (filename + page/section) shown under each answer
+- Grounded answers only by default: if the documents don't contain the answer, the assistant says so explicitly instead of guessing
+- Optional per-conversation toggle to fall back to **live web search** (DuckDuckGo, no API key) when documents don't have the answer — more accurate than relying on the small local model's memorized knowledge, with clickable web citations and a clear "not from your documents" badge
+- Source citations (filename + page/section, or web title + domain + link) shown under each answer
 - Multi-turn conversations with history, a conversation sidebar, and the ability to start/delete chats
 - Document management: see status, type, chunk count, upload date; delete a document and its vectors are removed too (no orphaned embeddings)
 - Clean error handling throughout — no raw stack traces reach the UI
@@ -57,10 +58,10 @@ flowchart LR
 3. **Chunk** — the full document text is chunked with overlap (~1000 chars, 150 overlap by default); each chunk remembers which page/section it started in.
 4. **Embed** — chunks are embedded locally via Ollama's `nomic-embed-text` and L2-normalized.
 5. **Store** — vectors go into a FAISS index (id-mapped to SQLite chunk rows); metadata (filename, page/section, chunk text) goes into SQLite.
-6. **Ask** — the latest user question is embedded and used to search FAISS (top 5, by default), filtered by a similarity threshold — this is the retrieval signal, independent of conversation history.
-7. **Ground** — if no documents are indexed, or nothing clears the relevance threshold, the app returns *"I couldn't find sufficient information in the uploaded documents to answer that."* directly, without calling the LLM.
-8. **Generate** — otherwise, the system prompt, numbered retrieved context, recent conversation history, and the question are sent to `llama3.2:3b`, which is instructed to answer only from the provided context.
-9. **Cite** — sources (filename + page/section) are deduplicated and returned alongside the answer; the UI shows the model's own "I couldn't find..." refusal without stale sources attached.
+6. **Ask** — the latest user question is embedded and used to search FAISS (top 5, by default) — this is the retrieval signal, independent of conversation history. Hits are filtered by a similarity threshold, except for small document sets (≤12 chunks), where similarity scores aren't well-calibrated enough to threshold reliably — the LLM's own judgment decides relevance instead.
+7. **Ground / fall back** — if no documents are indexed, or nothing clears the relevance threshold, the app either refuses (*"I couldn't find sufficient information in the uploaded documents to answer that."*, no LLM call) or, if the "also use general knowledge" toggle is on, runs a live DuckDuckGo web search and answers from those results instead of relying on the model's own (often stale or wrong) memorized knowledge — falling back further to plain model recall only if search is unavailable.
+8. **Generate** — the system prompt, numbered retrieved context (document or web), recent conversation history, and the question are sent to `llama3.2:3b`, which is instructed to answer only from the provided context.
+9. **Cite** — sources are deduplicated and returned alongside the answer, tagged `grounded: true/false` and `kind: document/web` so the UI can show exactly where an answer came from — including a distinct badge whenever it isn't grounded in the user's own documents.
 
 ## Prerequisites
 
@@ -114,14 +115,18 @@ EMBEDDING_MODEL=nomic-embed-text
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=150
 TOP_K=5
-SIMILARITY_THRESHOLD=0.4
+SIMILARITY_THRESHOLD=0.5
+SMALL_CORPUS_CHUNK_LIMIT=12
 HISTORY_TURNS=6
 
 MAX_FILE_SIZE_MB=20
 ALLOWED_ORIGINS=http://localhost:5173
+
+ENABLE_WEB_SEARCH=true
+WEB_SEARCH_MAX_RESULTS=5
 ```
 
-No API keys are required anywhere — everything runs against your local Ollama server.
+No API keys are required anywhere — chat/embeddings run against your local Ollama server, and web search (when the toggle is on) uses DuckDuckGo, which doesn't require a key either. Set `ENABLE_WEB_SEARCH=false` to disable that fallback entirely (the general-knowledge toggle then falls back to the model's own memorized knowledge instead).
 
 ## Example usage
 
@@ -146,7 +151,8 @@ rag-document-chatbot/
 │   │   ├── embedding_service.py    # Ollama embeddings
 │   │   ├── vector_store_service.py # FAISS wrapper (add/search/remove/persist)
 │   │   ├── llm_service.py          # Ollama chat completions
-│   │   └── rag_service.py          # retrieval + grounding + citations
+│   │   ├── web_search_service.py   # DuckDuckGo web search (no API key)
+│   │   └── rag_service.py          # retrieval + grounding + web-search fallback + citations
 │   ├── models/schemas.py        # Pydantic request/response models
 │   ├── utils/                   # validation, typed errors + FastAPI exception handlers
 │   ├── storage/                 # uploads/, app.db, index.faiss (gitignored, created at runtime)
@@ -183,11 +189,14 @@ Tests use a stubbed embedding function (no network calls), with an isolated tmp-
 | Every answer says "I couldn't find sufficient information..." | No documents are indexed yet, or `SIMILARITY_THRESHOLD` is too high for your content — lower it in `backend/.env`. |
 | Frontend can't reach the backend | Confirm `uvicorn` is running on port 8000 and the Vite proxy in `frontend/vite.config.ts` still points at it. |
 | PDF produces no text / "No readable text" error | The PDF is likely scanned/image-only; OCR isn't supported. Try a text-based PDF. |
+| Web-search fallback returns a plain (unsourced) answer | DuckDuckGo search failed or returned nothing (network issue, rate limit) — the app silently falls back to the model's own general knowledge. Check backend logs for "Web search failed". |
 
 ## Remaining limitations
 
 - No OCR — scanned/image-only PDFs won't extract text.
 - Retrieval uses only the latest question (by design, per the spec), so pronoun-heavy follow-ups like "summarize *that*" can retrieve weakly; rephrasing with the topic explicit works better.
 - No hybrid (keyword) search or reranking — vector search only, to keep the system simple and maintainable.
+- Web search uses DuckDuckGo's unofficial/unauthenticated interface (via the `ddgs` package) — it's free and keyless, but can occasionally rate-limit or change without notice; the app falls back to the model's own knowledge if a search fails.
+- `llama3.2:3b` is a small model — even with web search or documents grounding it, expect occasional reasoning mistakes on complex multi-step questions. Swapping `CHAT_MODEL` in `.env` for a larger Ollama model (e.g. `llama3.1:8b`) improves this at the cost of speed/RAM.
 - Single-user, no authentication — intended for local/personal use.
 - No streaming responses — answers arrive as one complete response.

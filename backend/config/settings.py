@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 20
     allowed_origins: str = "http://localhost:5173"
 
+    enable_web_search: bool = True
+    web_search_max_results: int = 5
+
     storage_dir: Path = BACKEND_DIR / "storage"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

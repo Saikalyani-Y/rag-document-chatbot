@@ -33,6 +33,15 @@ GENERAL_SYSTEM_PROMPT = (
     "say so rather than guessing with false confidence."
 )
 
+WEB_SYSTEM_PROMPT = (
+    "You are a helpful assistant. The user's uploaded documents did not contain relevant "
+    "information for this question, so you were given live web search results instead — "
+    "prefer these over your own memorized knowledge, since they're more current and "
+    "specific. Synthesize a clear, direct answer from the search results below. If the "
+    "results don't actually answer the question, say so plainly instead of guessing. When "
+    "you use a result, refer to it using the [n] markers already present in it."
+)
+
 
 def _chat(messages: list[dict]) -> str:
     try:
@@ -61,6 +70,16 @@ def generate_answer(context: str, history: list[dict], question: str) -> str:
 def generate_general_answer(history: list[dict], question: str) -> str:
     messages = [
         {"role": "system", "content": GENERAL_SYSTEM_PROMPT},
+        *history,
+        {"role": "user", "content": question},
+    ]
+    return _chat(messages)
+
+
+def generate_web_grounded_answer(search_context: str, history: list[dict], question: str) -> str:
+    messages = [
+        {"role": "system", "content": WEB_SYSTEM_PROMPT},
+        {"role": "system", "content": f"Search results:\n{search_context}"},
         *history,
         {"role": "user", "content": question},
     ]

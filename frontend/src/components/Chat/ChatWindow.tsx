@@ -38,13 +38,13 @@ export function ChatWindow() {
             <span className="absolute left-0.5 h-3 w-3 rounded-full bg-white transition-transform peer-checked:translate-x-3" />
           </span>
           <Globe size={12} />
-          Also use general knowledge when documents don't have the answer
+          Also search the web when documents don't have the answer
         </label>
 
         <ChatInput onSend={ask} disabled={sending} />
         <p className="mt-2 text-center text-xs text-neutral-400 dark:text-neutral-600">
           {allowGeneralKnowledge
-            ? 'Answers use your documents first, falling back to general knowledge — check the badge on each answer.'
+            ? 'Answers use your documents first, falling back to live web search — check the badge on each answer.'
             : 'Answers are grounded in your uploaded documents and may be incomplete.'}
         </p>
       </div>

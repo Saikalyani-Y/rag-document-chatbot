@@ -1,5 +1,5 @@
 from config.settings import settings
-from services import embedding_service, llm_service
+from services import embedding_service, llm_service, web_search_service
 from services.vector_store_service import vector_store
 import db
 
@@ -54,11 +54,13 @@ def answer_question(conversation_id: str, question: str, allow_general: bool = F
             seen_source_keys.add(source_key)
             sources.append(
                 {
+                    "kind": "document",
                     "document_id": row["document_id"],
                     "filename": row["filename"],
                     "label": label,
                     "chunk_id": chunk_id,
                     "score": round(score, 3),
+                    "url": None,
                 }
             )
 
@@ -72,10 +74,31 @@ def answer_question(conversation_id: str, question: str, allow_general: bool = F
 
 
 def _fallback(history: list[dict], question: str, allow_general: bool) -> dict:
-    """No document context cleared the relevance bar. Either refuse, or answer from the
-    model's general knowledge if the caller opted into that — clearly marked as ungrounded."""
+    """No document context cleared the relevance bar. Either refuse, answer from live web
+    search (preferred — more accurate than the model's memorized knowledge), or fall back
+    further to the model's own general knowledge if search is unavailable/disabled."""
     if not allow_general:
         return {"answer": NOT_FOUND_MESSAGE, "sources": [], "grounded": False}
+
+    if settings.enable_web_search:
+        results = web_search_service.search_web(question, settings.web_search_max_results)
+        if results:
+            context_parts = [f"[{i}] {r['title']} ({r['domain']})\n{r['snippet']}" for i, r in enumerate(results, 1)]
+            search_context = "\n\n".join(context_parts)
+            answer = llm_service.generate_web_grounded_answer(search_context, history, question)
+            sources = [
+                {
+                    "kind": "web",
+                    "document_id": None,
+                    "filename": r["title"],
+                    "label": r["domain"],
+                    "chunk_id": i,
+                    "score": 0.0,
+                    "url": r["url"],
+                }
+                for i, r in enumerate(results, 1)
+            ]
+            return {"answer": answer, "sources": sources, "grounded": False}
 
     answer = llm_service.generate_general_answer(history, question)
     return {"answer": answer, "sources": [], "grounded": False}

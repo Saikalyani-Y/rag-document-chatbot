@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import db
-from services import document_service, embedding_service, llm_service, rag_service
+from services import document_service, embedding_service, llm_service, rag_service, web_search_service
 from services.vector_store_service import vector_store
 
 
@@ -42,7 +42,31 @@ def test_no_documents_returns_not_found_without_calling_llm(monkeypatch, convers
     assert called is False
 
 
-def test_no_documents_with_general_knowledge_allowed_calls_llm(monkeypatch, conversation_id):
+def test_no_documents_with_general_knowledge_allowed_uses_web_search(monkeypatch, conversation_id):
+    monkeypatch.setattr(
+        web_search_service,
+        "search_web",
+        lambda query, max_results: [{"title": "Paris", "url": "https://en.wikipedia.org/wiki/Paris", "domain": "en.wikipedia.org", "snippet": "Paris is the capital of France."}],
+    )
+    monkeypatch.setattr(llm_service, "generate_web_grounded_answer", lambda ctx, history, question: "Paris, per [1].")
+    monkeypatch.setattr(
+        llm_service, "generate_general_answer", lambda *a, **k: pytest.fail("Should prefer web search over pure recall")
+    )
+    monkeypatch.setattr(
+        llm_service, "generate_answer", lambda *a, **k: pytest.fail("Grounded LLM path should not be used")
+    )
+
+    result = rag_service.answer_question(conversation_id, "What is the capital of France?", allow_general=True)
+
+    assert result["answer"] == "Paris, per [1]."
+    assert result["grounded"] is False
+    assert len(result["sources"]) == 1
+    assert result["sources"][0]["kind"] == "web"
+    assert result["sources"][0]["url"] == "https://en.wikipedia.org/wiki/Paris"
+
+
+def test_general_knowledge_falls_back_further_when_web_search_unavailable(monkeypatch, conversation_id):
+    monkeypatch.setattr(web_search_service, "search_web", lambda query, max_results: [])
     monkeypatch.setattr(llm_service, "generate_general_answer", lambda history, question: "General answer.")
     monkeypatch.setattr(
         llm_service, "generate_answer", lambda *a, **k: pytest.fail("Grounded LLM path should not be used")
